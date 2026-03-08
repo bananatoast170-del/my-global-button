@@ -1,121 +1,134 @@
 <!DOCTYPE html>
-<html lang="en" dir="ltr">
+<html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Global Button</title>
-    <!-- Using Tailwind CSS for modern styling -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>משחק קליקר מגניב</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+        }
+
+        .container {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2rem;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        h1 { font-size: 3rem; margin-bottom: 0.5rem; }
         
-        .btn-bounce:active {
-            transform: scale(0.95);
+        #score-display {
+            font-size: 2rem;
+            margin-bottom: 2rem;
+            color: #f1c40f;
+        }
+
+        #click-button {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            border: none;
+            background-color: #e74c3c;
+            color: white;
+            font-size: 1.5rem;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 10px #c0392b;
+            transition: all 0.1s;
+            outline: none;
+        }
+
+        #click-button:active {
+            box-shadow: 0 2px #c0392b;
+            transform: translateY(8px);
+        }
+
+        .upgrade-section {
+            margin-top: 2rem;
+        }
+
+        button.upgrade {
+            padding: 10px 20px;
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        button.upgrade:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
         }
     </style>
 </head>
-<body class="bg-slate-900 min-h-screen flex items-center justify-center p-6">
+<body>
 
-    <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center border border-slate-200">
-        <h1 class="text-3xl font-black text-slate-800 mb-2">Global Clicker 🌎</h1>
-        <p class="text-slate-500 mb-8 text-sm">Everyone in the world clicks the same button!</p>
-
-        <div class="bg-slate-50 rounded-2xl py-8 mb-8 border-2 border-slate-100">
-            <div id="loading" class="text-slate-400 animate-pulse text-sm font-medium">Connecting to network...</div>
-            <div id="counter" class="text-7xl font-black text-indigo-600 hidden leading-none">0</div>
-            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-4">Total Worldwide Clicks</div>
-        </div>
-
-        <button id="clickBtn" disabled class="btn-bounce w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white font-bold py-5 rounded-2xl text-xl shadow-lg shadow-indigo-200 transition-all duration-150 cursor-pointer disabled:cursor-not-allowed">
-            CLICK ME! 🚀
-        </button>
-
-        <p id="error-msg" class="text-red-500 text-xs mt-4 h-4 font-medium"></p>
+    <div class="container">
+        <h1>קליקר!</h1>
+        <div id="score-display">נקודות: <span id="score">0</span></div>
         
-        <div class="mt-8 pt-6 border-t border-slate-100">
-            <p class="text-[10px] text-slate-300 font-bold uppercase tracking-tight">GitHub Demo Project</p>
+        <button id="click-button">לחץ עליי!</button>
+
+        <div class="upgrade-section">
+            <button id="upgrade-btn" class="upgrade">שדרוג: +2 לכל לחיצה (מחיר: 10)</button>
         </div>
     </div>
 
-    <!-- Firebase SDK -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, doc, onSnapshot, updateDoc, increment, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    <script>
+        // משתני המשחק
+        let score = 0;
+        let pointsPerClick = 1;
+        let upgradeCost = 10;
 
-        // Environment Config
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'global-clicker-en';
+        // אלמנטים מה-DOM
+        const scoreElement = document.getElementById('score');
+        const clickBtn = document.getElementById('click-button');
+        const upgradeBtn = document.getElementById('upgrade-btn');
 
-        // 6-segment path to document for Firestore compliance
-        const counterDoc = doc(db, 'artifacts', appId, 'public', 'data', 'counters', 'global');
-        
-        const counterEl = document.getElementById('counter');
-        const loadingEl = document.getElementById('loading');
-        const btn = document.getElementById('clickBtn');
-        const errorEl = document.getElementById('error-msg');
+        // פונקציית לחיצה
+        clickBtn.addEventListener('click', () => {
+            score += pointsPerClick;
+            updateDisplay();
+        });
 
-        async function initApp() {
-            try {
-                // Step 1: Authentication
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
+        // פונקציית שדרוג
+        upgradeBtn.addEventListener('click', () => {
+            if (score >= upgradeCost) {
+                score -= upgradeCost;
+                pointsPerClick += 1;
+                upgradeCost = Math.floor(upgradeCost * 1.5); // המחיר עולה
+                
+                upgradeBtn.innerText = `שדרוג: +${pointsPerClick + 1} לכל לחיצה (מחיר: ${upgradeCost})`;
+                updateDisplay();
+            }
+        });
 
-                // Step 2: Auth State Change
-                onAuthStateChanged(auth, async (user) => {
-                    if (!user) return;
-
-                    try {
-                        // Check if document exists, create if not
-                        const snap = await getDoc(counterDoc);
-                        if (!snap.exists()) {
-                            await setDoc(counterDoc, { total: 0 });
-                        }
-
-                        // Real-time listener for the global counter
-                        onSnapshot(counterDoc, (d) => {
-                            if (d.exists()) {
-                                counterEl.innerText = d.data().total.toLocaleString();
-                                loadingEl.classList.add('hidden');
-                                counterEl.classList.remove('hidden');
-                                btn.disabled = false;
-                            }
-                        }, (err) => {
-                            console.error("Firestore error:", err);
-                            errorEl.innerText = "Error syncing with live database.";
-                        });
-                    } catch (err) {
-                        console.error("Firestore Init Error:", err);
-                        errorEl.innerText = "Database access denied.";
-                    }
-                });
-
-                // Click event handling
-                btn.onclick = async () => {
-                    if (!auth.currentUser) return;
-                    try {
-                        // Incrementing the value directly in the cloud
-                        await updateDoc(counterDoc, { total: increment(1) });
-                    } catch (err) {
-                        console.error("Update failed:", err);
-                        errorEl.innerText = "Failed to save click. Try again.";
-                    }
-                };
-
-            } catch (e) {
-                console.error("Main initialization error:", e);
-                errorEl.innerText = "Network connection failed.";
+        // עדכון התצוגה והכפתורים
+        function updateDisplay() {
+            scoreElement.innerText = score;
+            
+            // בדיקה אם אפשר לקנות שדרוג
+            if (score >= upgradeCost) {
+                upgradeBtn.disabled = false;
+            } else {
+                upgradeBtn.disabled = true;
             }
         }
 
-        initApp();
+        // אתחול ראשוני
+        updateDisplay();
     </script>
 </body>
 </html>
